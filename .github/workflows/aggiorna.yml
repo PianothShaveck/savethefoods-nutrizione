@@ -1,0 +1,78 @@
+name: Aggiorna catalogo e pubblica
+
+on:
+  schedule:
+    # Lunedì, giovedì e sabato: intervalli di 2-3 giorni, 04:17 UTC.
+    - cron: '17 4 * * 1,4,6'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'savethefoods.py'
+      - 'requirements.txt'
+      - 'test_savethefoods.py'
+      - '.github/workflows/aggiorna.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: savethefoods-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Installa dipendenze
+        run: python -m pip install -r requirements.txt
+      - name: Verifica parser
+        run: python -m unittest -v test_savethefoods.py
+      - name: Aggiorna catalogo
+        run: python savethefoods.py --no-browser --cartella data
+      - name: Prepara pagina
+        run: |
+          mkdir -p _site
+          cp data/savethefoods_dashboard.html _site/index.html
+          cp data/prodotti_savethefoods.csv _site/
+          cp data/prodotti_savethefoods.json _site/
+          touch _site/.nojekyll
+      - name: Salva lo storico dei dati
+        # Il commit conserva i dati e mantiene attiva la repository.
+        # I commit del GITHUB_TOKEN non riavviano ricorsivamente questo workflow.
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/prodotti_savethefoods.json data/prodotti_savethefoods.csv
+          if ! git diff --cached --quiet; then
+            git commit -m "Aggiorna catalogo SaveTheFoods [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Pubblica su GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

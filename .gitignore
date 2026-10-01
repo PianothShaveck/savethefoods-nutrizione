@@ -1,0 +1,11 @@
+__pycache__/
+.venv/
+_site/
+*.tmp
+errori_ultimo_aggiornamento.json
+data/savethefoods_dashboard.html
+savethefoods_dashboard.html
+prodotti_savethefoods.csv
+prodotti_savethefoods.json
+!data/prodotti_savethefoods.csv
+!data/prodotti_savethefoods.json
